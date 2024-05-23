@@ -1,3 +1,3 @@
 .venv
-__pycache__
 *.dll
+__pycache__
