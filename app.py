@@ -7,7 +7,7 @@ from flask import Flask, render_template, request, jsonify
 import base64
 import logging
 import uuid
-import cv2
+# import cv2
 import numpy as np
 
 from face import InitFaceSDK, GetLivenessInfo, GetFeatureInfo
