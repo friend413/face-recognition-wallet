@@ -9,6 +9,10 @@ from face import GetFaceSimilarity
 
 database_base_name = 'users'
 table_name = "feature"
+wallet_table_name = "wallet"
+
+sqlite_insert_face_wallet_query = "INSERT INTO " + wallet_table_name + " (id, features, private_key, public_key) VALUES (?, ?, ?, ?)"
+
 sqlite_insert_blob_query = "INSERT INTO " + table_name + " (id, name, features) VALUES (?, ?, ?)"
 sqlite_create_table_query = "CREATE TABLE " + table_name + " ( id INTEGER PRIMARY KEY, name TEXT, features BLOB NOT NULL)"
 
@@ -92,6 +96,22 @@ def clear_database():
     face_database.commit()
     cursor.close()
     return
+
+def register_face_wallet(features):
+    id, _, _ = verify_face(features)
+    if id != -1:
+        return id
+
+    global face_database
+    global max_id
+    max_id = max_id + 1
+    id = max_id
+    cursor = face_database.cursor()
+    cursor.execute(sqlite_insert_blob_query, (id, "", np.frombuffer(features, dtype=np.uint8).tostring()))
+    face_database.commit()
+    cursor.close()
+    data_all.append({'id':id, 'name':"", 'features':features})
+    return id
 
 def register_face(features):
     id, _, _ = verify_face(features)
