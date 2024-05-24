@@ -20,11 +20,46 @@ print('Init Face Engine', ret)
 
 app = Flask(__name__)
 
-db_manage.open_database(0)
+# db_manage.open_database(0)
+db_ret = db_manage.open_database(0)
+if db_ret != 0:
+    print('Failed to open database:', db_ret)
+    # Consider adding more robust error handling here
+else:
+    print('Database opened successfully')
 
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route("/get_wallet", methods=['POST'])
+def get_wallet():
+    content = request.get_json()
+    imageBase64 = content['image'][22:]
+    image = Image.open(BytesIO(base64.b64decode(imageBase64))).convert('RGB')
+    box, liveness, result = GetLivenessInfo(image)
+
+    if liveness == 1:
+        face_width = box[2] - box[0]
+        if face_width < 150:
+            result = 'Move Closer'
+        elif face_width > 210:
+            result = 'Go Back'
+        else:
+            box, liveness, feature = GetFeatureInfo(image, 0)
+
+            result = db_manage.register_face_wallet(feature)
+            if result == -1:
+                # create new wallet & register it in db & return create wallet
+                new_wallet = 1
+
+                result = new_wallet
+
+    response = jsonify({"status": result})
+    response.status_code = 200
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
+
 
 @app.route("/enroll_user", methods=['POST'])
 def enroll_user():
