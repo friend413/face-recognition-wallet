@@ -35,7 +35,12 @@ def open_database(db_no):
     global face_database
 
     db_name = database_base_name + str(db_no) + ".db"
-    face_database = sqlite3.connect(db_name, check_same_thread=False)
+    try:
+        face_database = sqlite3.connect(db_name, check_same_thread=False)
+        print(f"Database {db_name} connected successfully.")
+    except sqlite3.Error as e:
+        print(f"Error connecting to database {db_name}: {e}")
+        return
 
     cursor = face_database.execute(f"PRAGMA table_info({table_name})")
     columns = cursor.fetchall()
