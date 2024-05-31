@@ -6,8 +6,10 @@ import FaceManage.manage as db_manage
 from flask import Flask, render_template, request, jsonify
 import base64
 import logging
+import requests
 import uuid
 # import cv2
+from flask_cors import CORS
 import numpy as np
 
 from face import InitFaceSDK, GetLivenessInfo, GetFeatureInfo
@@ -19,22 +21,27 @@ print('Init Face Engine', ret)
 #print('Init IDOCR Engine', ret)
 
 app = Flask(__name__)
-
+CORS(app)
 # db_manage.open_database(0)
 db_ret = db_manage.open_database(0)
 
-@app.route('/')
+@app.route('/') 
 def home():
     return render_template('index.html')
 
-@app.route("/get_wallet", methods=['POST'])
+@app.route("/get_wallet2", methods=['POST'])
 def get_wallet():
-    print('>>>>>>>>>> get wallet')
     content = request.get_json()
+    print(" ----Get wallet---- ")
+    print(content)
+    print(" ****************** ")
     imageBase64 = content['image'][22:]
     image = Image.open(BytesIO(base64.b64decode(imageBase64))).convert('RGB')
     box, liveness, result = GetLivenessInfo(image)
 
+    print(" ---- result ---- ")
+    print(result)
+    print(" ****************** ")
     if liveness == 1:
         face_width = box[2] - box[0]
         if face_width < 150:
@@ -44,22 +51,61 @@ def get_wallet():
         else:
             box, liveness, feature = GetFeatureInfo(image, 0)
 
-            result = feature
+            result = "ok"
             # result = db_manage.register_face_wallet(feature)
             # if result == -1:
             #     # create new wallet & register it in db & return create wallet
             #     new_wallet = 1
 
             #     result = new_wallet
+    print(" ---- result2 ---- ")
+    print(result)
+    print(" ****************** ")
     response = jsonify({"status": result})
     response.status_code = 200
     response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
 
 
-@app.route("/enroll_user", methods=['POST'])
+@app.route("/create_wallet", methods=['POST'])
 def enroll_user():
+    # payload = {
+    #     "feature_info": "your_feature_info_here"
+    # }
+    # rust_server_url = 'http://localhost:8799/create_wallet'
+
+    # # Send the POST request to the other server
+    # try:
+    #     ret = requests.post(rust_server_url, json=payload)
+    #     ret.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
+    # except requests.exceptions.RequestException as e:
+    #     return jsonify({'error': str(e)}), 500
+
+    # result = 'Create OK'
+    # address = ret.json().get('wallet_address')
+    # if not address:
+    #     return jsonify({'error': 'No wallet address received from Rust server'}), 500
+    # print("here2")
+    # print(address)
+    # # id = db_manage.register_face(feature)
+    # # if id == -1:
+    # #     result = 'Already Exist'
+    # # else:
+    # #     result = 'Create OK'
+
+    # response = jsonify({"status": result, "wallet_address": address})
+    # response.status_code = 200
+    # response.headers["Content-Type"] = "application/json; charset=utf-8"
+    # print("  //// ***** \\\\ ")
+    # print(response)
+    # return response
+
+    # --here
+
     content = request.get_json()
+    print(" -------Enrol user------ ")
+    print(content)
+    print(" ****************** ")
     imageBase64 = content['image'][22:]
     image = Image.open(BytesIO(base64.b64decode(imageBase64))).convert('RGB')
     box, liveness, result = GetLivenessInfo(image)
@@ -67,6 +113,7 @@ def enroll_user():
     if liveness == 1:
         idx = 0
         face_width = box[2] - box[0]
+        address = "none"
         if face_width < 150:
             result = 'Move Closer'
         elif face_width > 210:
@@ -74,19 +121,37 @@ def enroll_user():
         else:
             box, liveness, feature = GetFeatureInfo(image, 0)
 
-            id = db_manage.register_face(feature)
-            if id == -1:
-                result = 'Already Exist'
-            else:
-                result = 'Enroll OK'
+            payload = {
+                "feature_info": "your_feature_info_here"
+            }
+            rust_server_url = 'http://localhost:8799/create_wallet'
+
+            # Send the POST request to the other server
+            try:
+                ret = requests.post(rust_server_url, json=payload)
+                ret.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
+            except requests.exceptions.RequestException as e:
+                return jsonify({'error': str(e)}), 500
+
+            result = 'Create OK'
+            address = ret.json().get('wallet_address')
+            if not address:
+                return jsonify({'error': 'No wallet address received from Rust server'}), 500
+            print("here2")
+            print(address)
+            # id = db_manage.register_face(feature)
+            # if id == -1:
+            #     result = 'Already Exist'
+            # else:
+            #     result = 'Create OK'
 
 
-    response = jsonify({"status": result})
+    response = jsonify({"status": result, "wallet_address": address})
     response.status_code = 200
     response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
 
-@app.route("/verify_user", methods=['POST'])
+@app.route("/get_wallet", methods=['POST'])
 def verify_user():
     content = request.get_json()
     imageBase64 = content['image'][22:]
@@ -149,6 +214,7 @@ def verify_user_with_name():
     response.status_code = 200
     response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
+
 @app.route("/remove_user_by_face", methods=['POST'])
 def remove_user_by_face():
     #print('>>>>>>>> removal in progress')
