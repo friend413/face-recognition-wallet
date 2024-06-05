@@ -11,12 +11,12 @@ database_base_name = 'users'
 table_name = "feature"
 wallet_table_name = "wallet"
 
-sqlite_insert_face_wallet_query = "INSERT INTO " + wallet_table_name + " (id, features, private_key, public_key) VALUES (?, ?, ?, ?)"
+sqlite_insert_face_wallet_query = "INSERT INTO " + wallet_table_name + " (id, features, token, public_key) VALUES (?, ?, ?, ?)"
 
 sqlite_insert_blob_query = "INSERT INTO " + table_name + " (id, name, features) VALUES (?, ?, ?)"
-sqlite_create_table_query = "CREATE TABLE " + table_name + " ( id INTEGER PRIMARY KEY, name TEXT, features BLOB NOT NULL)"
+sqlite_create_table_query = "CREATE TABLE " + table_name + " ( id INTEGER PRIMARY KEY, name TEXT, features BLOB NOT NULL, token VARCHAR(256), wallet_address VARCHAR(256) )"
 
-sqlite_update_all_query = "UPDATE " + table_name + " set name = ?, features = ? where id = ?"
+sqlite_update_all_query = "UPDATE " + table_name + " set name = ?, features = ?, wallet_address = ?, token = ? where id = ?"
 sqlite_search_query = "SELECT * FROM " + table_name
 sqlite_delete_all = "DELETE FROM " + table_name
 sqlite_delete_user = "DELETE FROM " + table_name + " where name = ?"
@@ -134,10 +134,10 @@ def register_face(features):
     data_all.append({'id':id, 'name':"", 'features':features})
     return id
 
-def update_face(id = None, name = None, features = None):
+def update_face(id = None, name = None, features = None, wallet_address = None, token = None):
     global face_database
     cursor = face_database.cursor()
-    cursor.execute(sqlite_update_all_query, (name, features.tostring(), id))
+    cursor.execute(sqlite_update_all_query, (name, features.tostring(), id, wallet_address, token))
     face_database.commit()
     cursor.close()
 
@@ -193,6 +193,19 @@ def verify_face_with_name(feat, name):
         return find_id, find_name, max_score
 
     return -1, None, None
+
+def get_wallet_info_by_id(id):
+    global face_database
+    cursor = face_database.cursor()
+    query = "SELECT id, wallet_address FROM " + table_name + " WHERE id = ?"
+    cursor.execute(query, (id,))
+    row = cursor.fetchone()
+    cursor.close()
+
+    if row:
+        return row[0], row[1]
+    else:
+        return None, None
 
 def get_info(id):
     for data in data_all:

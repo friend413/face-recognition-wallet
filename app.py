@@ -7,7 +7,11 @@ from flask import Flask, render_template, request, jsonify
 import base64
 import logging
 import requests
+import psycopg2
+from psycopg2 import sql
 import uuid
+from dotenv import load_dotenv
+
 # import cv2
 from flask_cors import CORS
 import numpy as np
@@ -15,6 +19,7 @@ import numpy as np
 from face import InitFaceSDK, GetLivenessInfo, GetFeatureInfo
 #from idocr import InitIDOCRSDK, GetIDOCRInfo
 
+load_dotenv()
 ret = InitFaceSDK()
 print('Init Face Engine', ret)
 #ret = InitIDOCRSDK()
@@ -69,38 +74,6 @@ def get_wallet():
 
 @app.route("/create_wallet", methods=['POST'])
 def enroll_user():
-    # payload = {
-    #     "feature_info": "your_feature_info_here"
-    # }
-    # rust_server_url = 'http://localhost:8799/create_wallet'
-
-    # # Send the POST request to the other server
-    # try:
-    #     ret = requests.post(rust_server_url, json=payload)
-    #     ret.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
-    # except requests.exceptions.RequestException as e:
-    #     return jsonify({'error': str(e)}), 500
-
-    # result = 'Create OK'
-    # address = ret.json().get('wallet_address')
-    # if not address:
-    #     return jsonify({'error': 'No wallet address received from Rust server'}), 500
-    # print("here2")
-    # print(address)
-    # # id = db_manage.register_face(feature)
-    # # if id == -1:
-    # #     result = 'Already Exist'
-    # # else:
-    # #     result = 'Create OK'
-
-    # response = jsonify({"status": result, "wallet_address": address})
-    # response.status_code = 200
-    # response.headers["Content-Type"] = "application/json; charset=utf-8"
-    # print("  //// ***** \\\\ ")
-    # print(response)
-    # return response
-
-    # --here
 
     content = request.get_json()
     print(" -------Enrol user------ ")
@@ -121,10 +94,14 @@ def enroll_user():
         else:
             box, liveness, feature = GetFeatureInfo(image, 0)
 
+            id = db_manage.register_face(feature)
+            if id == -1:
+                result = 'Already Exist'
+
             payload = {
-                "feature_info": "your_feature_info_here"
+                "uid": id
             }
-            rust_server_url = 'http://localhost:8799/create_wallet'
+            rust_server_url = os.getenv('RUST_SERVER_URL', 'http://localhost:8799/create_wallet')
 
             # Send the POST request to the other server
             try:
@@ -133,20 +110,24 @@ def enroll_user():
             except requests.exceptions.RequestException as e:
                 return jsonify({'error': str(e)}), 500
 
-            result = 'Create OK'
             address = ret.json().get('wallet_address')
-            if not address:
+            result = ret.json().get('result')
+            msg = ret.json().get('msg')
+            token = ret.json().get('token')
+
+            if not result:
+                # remove db 
+                db_manage.remove_face(feature)
                 return jsonify({'error': 'No wallet address received from Rust server'}), 500
-            print("here2")
-            print(address)
-            # id = db_manage.register_face(feature)
-            # if id == -1:
-            #     result = 'Already Exist'
-            # else:
-            #     result = 'Create OK'
+            
+            if result == 'Error':
+                # remove db 
+                db_manage.remove_face(feature)
+                return jsonify({'result': result, 'msg': msg}), 200
+            
+            db_manage.update_face(id, "", feature, address, "")
 
-
-    response = jsonify({"status": result, "wallet_address": address})
+    response = jsonify({"status": result, "msg": msg, "wallet_address": address, "token": token})
     response.status_code = 200
     response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
@@ -174,11 +155,40 @@ def verify_user():
             box, liveness, feature = GetFeatureInfo(image, 1)
             id, fname, face_score = db_manage.verify_face(feature)
             if id >= 0:
-                result, name = 'Verify OK', fname
+
+                id, address = db_manage.get_wallet_info_by_id(id)
+                payload = {
+                    "uid": id,
+                    "address": address
+                }
+                rust_server_url = os.getenv('RUST_SERVER_URL', 'http://localhost:8799/get_wallet')
+
+                # Send the POST request to the other server
+                try:
+                    ret = requests.post(rust_server_url, json=payload)
+                    ret.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
+                except requests.exceptions.RequestException as e:
+                    return jsonify({'error': str(e)}), 500
+                
+                address = ret.json().get('wallet_address')
+                token = ret.json().get('token')
+                result = ret.json().get('result')
+                msg = ret.json().get('msg')
+
+                if not result:
+                    # remove db 
+                    db_manage.remove_face(feature)
+                    return jsonify({'error': 'No wallet address received from Rust server'}), 500
+                if result == 'Error':
+                    # remove db 
+                    db_manage.remove_face(feature)
+                    return jsonify({'result': result, 'msg': msg}), 200
+
+
             if id == -2:
                 result = 'No Users'
 
-    response = jsonify({"status": result, "name": name, "liveness": str(liveness), "matching": str(face_score)})
+    response = jsonify({"status": result, "msg": msg, "token": token, "liveness": str(liveness), "matching": str(face_score), "address": address})
     response.status_code = 200
     response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
