@@ -137,7 +137,7 @@ def register_face(features):
 def update_face(id = None, name = None, features = None, wallet_address = None, token = None):
     global face_database
     cursor = face_database.cursor()
-    cursor.execute(sqlite_update_all_query, (name, features.tostring(), id, wallet_address, token))
+    cursor.execute(sqlite_update_all_query, (name, np.frombuffer(features, dtype=np.uint8).tostring(), wallet_address, token, id))
     face_database.commit()
     cursor.close()
 
@@ -146,23 +146,32 @@ def verify_face(feat):
     global max_id
     max_score = 0
 
+    data_all = get_all_data()
+    
+    print("verify_face with feat --------------")
+    print(data_all)
+    print("-------------- verify_face with feat ")
+
     if len(data_all) == 0:
         return -2, None, None
-    find_id, find_name = -1, None
+    find_id, find_wallet = -1, None
     for data in data_all:
-        id = data['id']
-        features = data['features']
+        id, features, wallet_address = data
+
+        print("each data --------------")
+        print(f"{id}, {wallet_address}")
+        print("-------------- each data ")
 
         score = GetFaceSimilarity(feat, features) # [sub_id,:]
-        print('>>>> Mathing Result', data['name'], score)
+        print('>>>> Mathing Result', wallet_address, score)
         if score >= max_score:
             max_score = score
             find_id = id
-            find_name = data['name']
+            find_wallet = wallet_address
 
     if max_score >= MATCHING_THRES:
         print("score = ", max_score)
-        return find_id, find_name, max_score
+        return find_id, find_wallet, max_score
 
     return -1, None, None
 
@@ -214,6 +223,19 @@ def get_info(id):
             return data['name'], data['features']
         else:
             return None, None, None, None, None
+def get_all_data():
+    global face_database, table_name
+    try:
+        cursor = face_database.cursor()
+        query = f"SELECT id, features, wallet_address FROM {table_name} WHERE 1"
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        cursor.close()
+        return rows
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
 
 def get_userlist():
     userlist = []

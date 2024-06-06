@@ -34,59 +34,21 @@ db_ret = db_manage.open_database(0)
 def home():
     return render_template('index.html')
 
-@app.route("/get_wallet2", methods=['POST'])
-def get_wallet():
-    content = request.get_json()
-    print(" ----Get wallet---- ")
-    print(content)
-    print(" ****************** ")
-    imageBase64 = content['image'][22:]
-    image = Image.open(BytesIO(base64.b64decode(imageBase64))).convert('RGB')
-    box, liveness, result = GetLivenessInfo(image)
-
-    print(" ---- result ---- ")
-    print(result)
-    print(" ****************** ")
-    if liveness == 1:
-        face_width = box[2] - box[0]
-        if face_width < 150:
-            result = 'Move Closer'
-        elif face_width > 210:
-            result = 'Go Back'
-        else:
-            box, liveness, feature = GetFeatureInfo(image, 0)
-
-            result = "ok"
-            # result = db_manage.register_face_wallet(feature)
-            # if result == -1:
-            #     # create new wallet & register it in db & return create wallet
-            #     new_wallet = 1
-
-            #     result = new_wallet
-    print(" ---- result2 ---- ")
-    print(result)
-    print(" ****************** ")
-    response = jsonify({"status": result})
-    response.status_code = 200
-    response.headers["Content-Type"] = "application/json; charset=utf-8"
-    return response
-
-
 @app.route("/create_wallet", methods=['POST'])
 def enroll_user():
 
     content = request.get_json()
     print(" -------Enrol user------ ")
-    print(content)
-    print(" ****************** ")
     imageBase64 = content['image'][22:]
     image = Image.open(BytesIO(base64.b64decode(imageBase64))).convert('RGB')
     box, liveness, result = GetLivenessInfo(image)
+    address = ""
+    token = ""
+    msg = ""
 
     if liveness == 1:
         idx = 0
         face_width = box[2] - box[0]
-        address = "none"
         if face_width < 150:
             result = 'Move Closer'
         elif face_width > 210:
@@ -97,15 +59,16 @@ def enroll_user():
             id = db_manage.register_face(feature)
             if id == -1:
                 result = 'Already Exist'
+                return jsonify({'status': result, 'msg': msg}), 200
 
             payload = {
                 "uid": id
             }
-            rust_server_url = os.getenv('RUST_SERVER_URL', 'http://localhost:8799/create_wallet')
+            rust_server_url = os.getenv('RUST_SERVER_URL', 'http://localhost:8799')
 
             # Send the POST request to the other server
             try:
-                ret = requests.post(rust_server_url, json=payload)
+                ret = requests.post(rust_server_url + '/create_wallet', json=payload)
                 ret.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
             except requests.exceptions.RequestException as e:
                 return jsonify({'error': str(e)}), 500
@@ -123,10 +86,11 @@ def enroll_user():
             if result == 'Error':
                 # remove db 
                 db_manage.remove_face(feature)
-                return jsonify({'result': result, 'msg': msg}), 200
+                return jsonify({'status': result, 'msg': msg}), 200
             
             db_manage.update_face(id, "", feature, address, "")
-
+    else:
+        print(" dont find ******** ")
     response = jsonify({"status": result, "msg": msg, "wallet_address": address, "token": token})
     response.status_code = 200
     response.headers["Content-Type"] = "application/json; charset=utf-8"
@@ -141,8 +105,10 @@ def verify_user():
     box, liveness, result = GetLivenessInfo(image)
 
     result = 'Verify Failed'
-    name = ''
     face_score = 0
+    address = ""
+    token = ""
+    msg = ""
 
     if liveness == 1:
         face_width = box[2] - box[0]
@@ -153,23 +119,35 @@ def verify_user():
             result = 'Go Back'
         else:
             box, liveness, feature = GetFeatureInfo(image, 1)
-            id, fname, face_score = db_manage.verify_face(feature)
+            id, address, face_score = db_manage.verify_face(feature)
             if id >= 0:
 
-                id, address = db_manage.get_wallet_info_by_id(id)
+                print("after verfiy_face --------")
+                print(f"id: {id}, address: {address}, face_score: {face_score}")
+                print("-------- after verfiy_face")
+                # id, address = db_manage.get_wallet_info_by_id(id)
+                
                 payload = {
                     "uid": id,
                     "address": address
                 }
-                rust_server_url = os.getenv('RUST_SERVER_URL', 'http://localhost:8799/get_wallet')
+                rust_server_url = os.getenv('RUST_SERVER_URL', 'http://localhost:8799')
 
+                print(rust_server_url + '/get_wallet')
                 # Send the POST request to the other server
                 try:
-                    ret = requests.post(rust_server_url, json=payload)
+                    print("python 1")
+                    ret = requests.post(rust_server_url + '/get_wallet', json=payload)
+                    print("python 2")
                     ret.raise_for_status()  # Raise an HTTPError for bad responses (4xx or 5xx)
+                    print("python 3")
                 except requests.exceptions.RequestException as e:
                     return jsonify({'error': str(e)}), 500
-                
+                print("python 4")
+                print(ret)
+                if address != ret.json().get('wallet_address'):
+                    print(" --------- ******* ----------- ")
+
                 address = ret.json().get('wallet_address')
                 token = ret.json().get('token')
                 result = ret.json().get('result')
