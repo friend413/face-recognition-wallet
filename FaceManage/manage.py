@@ -147,10 +147,6 @@ def verify_face(feat):
     max_score = 0
 
     data_all = get_all_data()
-    
-    print("verify_face with feat --------------")
-    print(data_all)
-    print("-------------- verify_face with feat ")
 
     if len(data_all) == 0:
         return -2, None, None
@@ -158,12 +154,7 @@ def verify_face(feat):
     for data in data_all:
         id, features, wallet_address = data
 
-        print("each data --------------")
-        print(f"{id}, {wallet_address}")
-        print("-------------- each data ")
-
-        score = GetFaceSimilarity(feat, features) # [sub_id,:]
-        print('>>>> Mathing Result', wallet_address, score)
+        score = GetFaceSimilarity(feat, features) 
         if score >= max_score:
             max_score = score
             find_id = id
@@ -190,7 +181,7 @@ def verify_face_with_name(feat, name):
         if data['name'].lower() != name.lower():
             continue
 
-        score = GetFaceSimilarity(feat, features) # [sub_id,:]
+        score = GetFaceSimilarity(feat, features) 
         print('>>>> Mathing Result', data['name'], score)
         if score >= max_score:
             max_score = score
