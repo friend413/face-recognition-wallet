@@ -125,7 +125,6 @@ def verify_user():
                 print("after verfiy_face --------")
                 print(f"id: {id}, address: {address}, face_score: {face_score}")
                 print("-------- after verfiy_face")
-                # id, address = db_manage.get_wallet_info_by_id(id)
                 
                 payload = {
                     "uid": id,
