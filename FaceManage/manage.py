@@ -102,15 +102,27 @@ def clear_database():
     cursor.close()
     return
 
+def get_max_id():
+    global face_database, table_name
+
+    cursor = face_database.cursor()
+    query = f"SELECT MAX(id) FROM {table_name}"
+    cursor.execute(query)
+
+    max_id = cursor.fetchone()[0]
+
+    cursor.close()
+    return max_id
+
 def register_face_wallet(features):
     id, _, _ = verify_face(features)
     if id != -1:
         return id
 
     global face_database
-    global max_id
-    max_id = max_id + 1
-    id = max_id
+    
+    max_id = get_max_id()
+    id = max_id + 1
     cursor = face_database.cursor()
     cursor.execute(sqlite_insert_blob_query, (id, "", np.frombuffer(features, dtype=np.uint8).tostring()))
     face_database.commit()
