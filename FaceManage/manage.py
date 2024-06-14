@@ -13,7 +13,7 @@ wallet_table_name = "wallet"
 
 sqlite_insert_face_wallet_query = "INSERT INTO " + wallet_table_name + " (id, features, token, public_key) VALUES (?, ?, ?, ?)"
 
-sqlite_insert_blob_query = "INSERT INTO " + table_name + " (id, name, features) VALUES (?, ?, ?)"
+sqlite_insert_blob_query = "INSERT INTO " + table_name + " (id, name, features, token, wallet_address) VALUES (?, ?, ?, ?, ?, ?)"
 sqlite_create_table_query = "CREATE TABLE " + table_name + " ( id INTEGER PRIMARY KEY, name TEXT, features BLOB NOT NULL, token VARCHAR(256), wallet_address VARCHAR(256) )"
 
 sqlite_update_all_query = "UPDATE " + table_name + " set name = ?, features = ?, wallet_address = ?, token = ? where id = ?"
@@ -114,33 +114,12 @@ def get_max_id():
     cursor.close()
     return max_id
 
-def register_face_wallet(features):
-    id, _, _ = verify_face(features)
-    if id != -1:
-        return id
+def register_face(id = None, name = None, features = None, wallet_address = None, token = None):
 
     global face_database
-    
-    max_id = get_max_id()
-    id = max_id + 1
-    cursor = face_database.cursor()
-    cursor.execute(sqlite_insert_blob_query, (id, "", np.frombuffer(features, dtype=np.uint8).tostring()))
-    face_database.commit()
-    cursor.close()
-    data_all.append({'id':id, 'name':"", 'features':features})
-    return id
 
-def register_face(features):
-    id, _, _ = verify_face(features)
-    if id >= 0:
-        return -1
-
-    global face_database
-    global max_id
-    max_id = max_id + 1
-    id = max_id
     cursor = face_database.cursor()
-    cursor.execute(sqlite_insert_blob_query, (id, "", np.frombuffer(features, dtype=np.uint8).tostring()))
+    cursor.execute(sqlite_insert_blob_query, (id, "", np.frombuffer(features, dtype=np.uint8).tostring(), wallet_address, token))
     face_database.commit()
     cursor.close()
     data_all.append({'id':id, 'name':"", 'features':features})
