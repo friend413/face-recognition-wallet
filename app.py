@@ -56,10 +56,11 @@ def enroll_user():
         else:
             box, liveness, feature = GetFeatureInfo(image, 0)
 
-            id = db_manage.register_face(feature)
-            if id == -1:
+            if db_manage.verfiy_face(feature) != -1:
                 result = 'Already Exist'
                 return jsonify({'status': result, 'msg': msg}), 200
+
+            id = db_manage.get_max_id() + 1
 
             payload = {
                 "uid": id
@@ -79,16 +80,12 @@ def enroll_user():
             token = ret.json().get('token')
 
             if not result:
-                # remove db 
-                db_manage.remove_face(feature)
                 return jsonify({'error': 'No wallet address received from Rust server'}), 500
             
             if result == 'Error':
-                # remove db 
-                db_manage.remove_face(feature)
                 return jsonify({'status': result, 'msg': msg}), 200
             
-            db_manage.update_face(id, "", feature, address, "")
+            db_manage.register_face(id, "", feature, address, "")
     else:
         print(" dont find ******** ")
     response = jsonify({"status": result, "msg": msg, "wallet_address": address, "token": token})
